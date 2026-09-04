@@ -28,7 +28,7 @@ jobs:
           cache: true
 
       - name: Generate Flutter Native Platform Files
-        run: flutter create --platforms=android --project-name stationery_inventory --offline .
+        run: flutter create --platforms=android --project-name stationery_inventory --no-pub .
 
       - name: Force Android SDK Version 36
         run: |
