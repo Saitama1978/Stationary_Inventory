@@ -30,10 +30,15 @@ jobs:
       - name: Generate Flutter Native Platform Files
         run: flutter create --platforms=android .
 
+      - name: Fix Android Compile SDK Version
+        run: |
+          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/g' android/app/build.gradle || true
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle || true
+
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Generate App Icons
+      - name: Generate App Icon
         run: dart run flutter_launcher_icons || true
 
       - name: Build APK
