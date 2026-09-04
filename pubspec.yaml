@@ -1,30 +1,53 @@
-name: stationery_inventory
-description: "Stationery Store Inventory Flutter App"
-publish_to: 'none'
-version: 1.0.0+1
+name: Build Android APK
 
-environment:
-  sdk: '>=3.0.0 <4.0.0'
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
 
-dependencies:
-  flutter:
-    sdk: flutter
-  cupertino_icons: ^1.0.8
-  pdf: ^3.10.8
-  printing: ^5.13.1
-  file_picker: ^8.0.0
-  csv: ^6.0.0
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^4.0.0
-  flutter_launcher_icons: ^0.13.1
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: false
-  image_path: "app_icon.png"
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
-flutter:
-  uses-material-design: true
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Generate Flutter Native Platform Files
+        run: flutter create --platforms=android .
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Force Android SDK Version 36
+        run: |
+          echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
+          find android -name "build.gradle*" -exec sed -i 's/compileSdkVersion.*/compileSdkVersion 36/g' {} +
+          find android -name "build.gradle*" -exec sed -i 's/compileSdk =.*/compileSdk = 36/g' {} +
+          find android -name "build.gradle*" -exec sed -i 's/targetSdkVersion.*/targetSdkVersion 36/g' {} +
+
+      - name: Generate App Icon
+        run: dart run flutter_launcher_icons || true
+
+      - name: Build APK
+        run: flutter build apk --release
+        
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stationery-inventory-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
