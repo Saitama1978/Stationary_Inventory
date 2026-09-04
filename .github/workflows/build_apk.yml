@@ -28,10 +28,7 @@ jobs:
           cache: true
 
       - name: Generate Flutter Native Platform Files
-        run: flutter create --platforms=android .
-
-      - name: Install Dependencies
-        run: flutter pub get
+        run: flutter create --platforms=android --project-name stationery_inventory .
 
       - name: Force Android SDK Version 36
         run: |
@@ -40,12 +37,15 @@ jobs:
           find android -name "build.gradle*" -exec sed -i 's/compileSdk =.*/compileSdk = 36/g' {} +
           find android -name "build.gradle*" -exec sed -i 's/targetSdkVersion.*/targetSdkVersion 36/g' {} +
 
+      - name: Install Dependencies
+        run: flutter pub get
+
       - name: Generate App Icon
         run: dart run flutter_launcher_icons || true
 
       - name: Build APK
         run: flutter build apk --release
-        
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
