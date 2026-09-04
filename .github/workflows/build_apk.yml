@@ -30,20 +30,22 @@ jobs:
       - name: Generate Flutter Native Platform Files
         run: flutter create --platforms=android .
 
-      - name: Fix Android Compile SDK Version
-        run: |
-          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/g' android/app/build.gradle || true
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle || true
-
       - name: Install Dependencies
         run: flutter pub get
+
+      - name: Force Android SDK Version 36
+        run: |
+          echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
+          find android -name "build.gradle*" -exec sed -i 's/compileSdkVersion.*/compileSdkVersion 36/g' {} +
+          find android -name "build.gradle*" -exec sed -i 's/compileSdk =.*/compileSdk = 36/g' {} +
+          find android -name "build.gradle*" -exec sed -i 's/targetSdkVersion.*/targetSdkVersion 36/g' {} +
 
       - name: Generate App Icon
         run: dart run flutter_launcher_icons || true
 
       - name: Build APK
         run: flutter build apk --release
-
+        
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
