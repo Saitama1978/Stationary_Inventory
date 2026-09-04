@@ -30,6 +30,13 @@ jobs:
       - name: Generate Flutter Native Platform Files
         run: flutter create --platforms=android --project-name stationery_inventory --no-pub .
 
+      - name: Set Android SDK Version 36 in Gradle Properties
+        run: |
+          mkdir -p android
+          echo "flutter.compileSdkVersion=36" >> android/gradle.properties
+          echo "flutter.targetSdkVersion=36" >> android/gradle.properties
+          echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
+
       - name: Install Dependencies
         run: flutter pub get
 
@@ -37,7 +44,7 @@ jobs:
         run: dart run flutter_launcher_icons || true
 
       - name: Build APK
-        run: flutter build apk --release --PcompileSdkVersion=36 --PtargetSdkVersion=36
+        run: flutter build apk --release
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
