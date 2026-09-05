@@ -91,8 +91,8 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     InventoryItem(
       name: 'Ballpen Black',
       category: 'Writing',
-      unit: 'pcs',
-      quantity: 100,
+      unit: 'box',
+      quantity: 10,
     ),
   ];
 
@@ -104,49 +104,50 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     'Office Equipment',
   ];
 
-  final List<String> _units = ['pcs', 'box', 'pack', 'set', 'roll'];
+  // Mas pinalawak na Units list
+  final List<String> _units = [
+    'pcs',
+    'box',
+    'pack',
+    'set',
+    'roll',
+    'pad',
+    'ream',
+    'bottle',
+    'can',
+    'pair',
+    'cartridge',
+    'tube',
+  ];
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _qtyController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
 
   String _searchQuery = '';
+  String _selectedCategoryFilter = 'All';
   String _selectedCategory = 'General';
   String _selectedUnit = 'pcs';
 
-  void _addItem() {
-    final String name = _nameController.text.trim();
-    final int? qty = int.tryParse(_qtyController.text);
-
-    if (name.isNotEmpty && qty != null) {
-      setState(() {
-        _items.add(
-          InventoryItem(
-            name: name,
-            category: _selectedCategory,
-            unit: _selectedUnit,
-            quantity: qty,
-          ),
-        );
-      });
+  void _showItemDialog({InventoryItem? itemToEdit, int? editIndex}) {
+    if (itemToEdit != null) {
+      _nameController.text = itemToEdit.name;
+      _qtyController.text = itemToEdit.quantity.toString();
+      _selectedCategory = itemToEdit.category;
+      _selectedUnit = itemToEdit.unit;
+    } else {
       _nameController.clear();
       _qtyController.clear();
-      _selectedCategory = 'General';
-      _selectedUnit = 'pcs';
-      Navigator.pop(context);
+      _selectedCategory = _categories.first;
+      _selectedUnit = _units.first;
     }
-  }
-
-  void _showAddItemDialog() {
-    _selectedCategory = _categories.first;
-    _selectedUnit = _units.first;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Add New Item'),
+            title: Text(itemToEdit == null ? 'Add New Item' : 'Edit Item'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -217,7 +218,35 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
-                onPressed: _addItem,
+                onPressed: () {
+                  final String name = _nameController.text.trim();
+                  final int? qty = int.tryParse(_qtyController.text);
+
+                  if (name.isNotEmpty && qty != null) {
+                    setState(() {
+                      if (itemToEdit != null && editIndex != null) {
+                        _items[editIndex] = InventoryItem(
+                          name: name,
+                          category: _selectedCategory,
+                          unit: _selectedUnit,
+                          quantity: qty,
+                        );
+                      } else {
+                        _items.add(
+                          InventoryItem(
+                            name: name,
+                            category: _selectedCategory,
+                            unit: _selectedUnit,
+                            quantity: qty,
+                          ),
+                        );
+                      }
+                    });
+                    _nameController.clear();
+                    _qtyController.clear();
+                    Navigator.pop(context);
+                  }
+                },
                 child: const Text('Save'),
               ),
             ],
@@ -231,7 +260,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     showAboutDialog(
       context: context,
       applicationName: 'Stationery Inventory',
-      applicationVersion: '1.2.0',
+      applicationVersion: '1.3.0',
       applicationIcon: const Icon(Icons.inventory, size: 48),
       children: const [
         Text('Developer: 2/O Renante N. Fullo'),
@@ -445,14 +474,22 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
   @override
   Widget build(BuildContext context) {
     final filteredItems = _items.where((item) {
-      return item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          item.category.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesSearch =
+          item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              item.category.toLowerCase().contains(_searchQuery.toLowerCase());
+
+      final matchesCategory = _selectedCategoryFilter == 'All' ||
+          item.category == _selectedCategoryFilter;
+
+      return matchesSearch && matchesCategory;
     }).toList();
 
     int totalQuantity = _items.fold(
       0,
       (sum, item) => sum + item.quantity,
     );
+
+    List<String> filterCategories = ['All', ..._categories];
 
     return Scaffold(
       appBar: AppBar(
@@ -540,7 +577,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search items or category...',
+                    hintText: 'Search items...',
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -556,6 +593,28 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                     });
                   },
                 ),
+                const SizedBox(height: 10),
+                // Category Filter Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: filterCategories.map((cat) {
+                      final isSelected = _selectedCategoryFilter == cat;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6.0),
+                        child: FilterChip(
+                          label: Text(cat),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              _selectedCategoryFilter = cat;
+                            });
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ],
             ),
           ),
@@ -567,8 +626,13 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                     itemBuilder: (context, index) {
                       final item = filteredItems[index];
                       final bool isLowStock = item.quantity <= 5;
+                      final originalIndex = _items.indexOf(item);
 
                       return ListTile(
+                        onTap: () => _showItemDialog(
+                          itemToEdit: item,
+                          editIndex: originalIndex,
+                        ),
                         leading: CircleAvatar(
                           backgroundColor:
                               isLowStock ? Colors.red.shade100 : null,
@@ -581,8 +645,8 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                         ),
                         title: Text(item.name),
                         subtitle: Text(
-                          '${item.category} • Low Stock Alert'
-                          '${isLowStock ? ' (Critical)' : ''}',
+                          '${item.category}'
+                          '${isLowStock ? ' • Low Stock Alert' : ''}',
                           style: TextStyle(
                             color: isLowStock ? Colors.red : null,
                           ),
@@ -596,6 +660,13 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                                 color: isLowStock ? Colors.red : null,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () => _showItemDialog(
+                                itemToEdit: item,
+                                editIndex: originalIndex,
                               ),
                             ),
                             IconButton(
@@ -615,7 +686,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddItemDialog,
+        onPressed: () => _showItemDialog(),
         icon: const Icon(Icons.add),
         label: const Text('Add Item'),
       ),
