@@ -30,44 +30,23 @@ jobs:
       - name: Generate Flutter Native Platform Files
         run: flutter create --platforms=android --project-name stationery_inventory --no-pub .
 
-      - name: Configure compileSdk in build.gradle.kts
+      - name: Inject Android SDK 36 Configurations
         run: |
-          python3 -c '
-          import os
+          # 1. Force compileSdk in app build.gradle.kts / build.gradle
+          find android -name "build.gradle.kts" -exec sed -i 's/compileSdk =.*/compileSdk = 36/g' {} +
+          find android -name "build.gradle" -exec sed -i 's/compileSdkVersion.*/compileSdkVersion 36/g' {} +
 
-          # Inject compileSdk override block for Kotlin DSL build.gradle.kts
-          override_code = """
-
+          # 2. Append subprojects override using legacy-compatible script block
+          cat << 'EOF' >> android/build.gradle.kts
           subprojects {
-              plugins.withId("com.android.application") {
-                  val android = extensions.getByType(com.android.build.gradle.AppExtension::class.java)
-                  android.compileSdkVersion(36)
-              }
-              plugins.withId("com.android.library") {
-                  val android = extensions.getByType(com.android.build.gradle.LibraryExtension::class.java)
-                  android.compileSdkVersion(36)
+              afterEvaluate {
+                  if (project.hasProperty("android")) {
+                      val android = project.extensions.findByName("android") as? com.android.build.gradle.BaseExtension
+                      android?.compileSdkVersion(36)
+                  }
               }
           }
-          """
-
-          file_path = "android/build.gradle.kts"
-          if os.path.exists(file_path):
-              with open(file_path, "a") as f:
-                  f.write(override_code)
-          elif os.path.exists("android/build.gradle"):
-              groovy_code = """
-              subprojects {
-                  plugins.withId("com.android.application") {
-                      android { compileSdkVersion 36 }
-                  }
-                  plugins.withId("com.android.library") {
-                      android { compileSdkVersion 36 }
-                  }
-              }
-              """
-              with open("android/build.gradle", "a") as f:
-                  f.write(groovy_code)
-          '
+          EOF
 
       - name: Install Dependencies
         run: flutter pub get
