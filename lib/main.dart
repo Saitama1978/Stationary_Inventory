@@ -57,14 +57,12 @@ class InventoryItem {
   String category;
   String unit;
   int quantity;
-  double price;
 
   InventoryItem({
     required this.name,
     required this.category,
     required this.unit,
     required this.quantity,
-    required this.price,
   });
 }
 
@@ -89,14 +87,12 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
       category: 'Paper',
       unit: 'pcs',
       quantity: 25,
-      price: 45.00,
     ),
     InventoryItem(
       name: 'Ballpen Black',
       category: 'Writing',
       unit: 'pcs',
       quantity: 100,
-      price: 12.00,
     ),
   ];
 
@@ -112,17 +108,17 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _qtyController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
+  String _searchQuery = '';
   String _selectedCategory = 'General';
   String _selectedUnit = 'pcs';
 
   void _addItem() {
     final String name = _nameController.text.trim();
     final int? qty = int.tryParse(_qtyController.text);
-    final double? price = double.tryParse(_priceController.text);
 
-    if (name.isNotEmpty && qty != null && price != null) {
+    if (name.isNotEmpty && qty != null) {
       setState(() {
         _items.add(
           InventoryItem(
@@ -130,13 +126,11 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
             category: _selectedCategory,
             unit: _selectedUnit,
             quantity: qty,
-            price: price,
           ),
         );
       });
       _nameController.clear();
       _qtyController.clear();
-      _priceController.clear();
       _selectedCategory = 'General';
       _selectedUnit = 'pcs';
       Navigator.pop(context);
@@ -214,16 +208,6 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _priceController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Price (PHP)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -247,10 +231,10 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     showAboutDialog(
       context: context,
       applicationName: 'Stationery Inventory',
-      applicationVersion: '1.0.0',
+      applicationVersion: '1.2.0',
       applicationIcon: const Icon(Icons.inventory, size: 48),
       children: const [
-        Text('Developer: Kenneth Quintero'),
+        Text('Developer: 2/O Renante N. Fullo'),
         SizedBox(height: 8),
         Text('A mobile application designed for efficient inventory management.'),
       ],
@@ -309,10 +293,9 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     if (!finalFileName.endsWith('.csv')) finalFileName = '$finalFileName.csv';
 
     List<List<dynamic>> rows = [
-      ['Item Name', 'Category', 'Unit', 'Quantity', 'Price'],
+      ['Item Name', 'Category', 'Quantity', 'Unit'],
       ..._items.map(
-        (item) =>
-            [item.name, item.category, item.unit, item.quantity, item.price],
+        (item) => [item.name, item.category, item.quantity, item.unit],
       ),
     ];
     String csvData = const ListToCsvConverter().convert(rows);
@@ -368,24 +351,22 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
           List<InventoryItem> loadedItems = [];
           for (int i = 1; i < fields.length; i++) {
             final row = fields[i];
-            if (row.length >= 5) {
+            if (row.length >= 4) {
               loadedItems.add(
                 InventoryItem(
                   name: row[0].toString(),
                   category: row[1].toString(),
-                  unit: row[2].toString(),
-                  quantity: int.tryParse(row[3].toString()) ?? 0,
-                  price: double.tryParse(row[4].toString()) ?? 0.0,
+                  quantity: int.tryParse(row[2].toString()) ?? 0,
+                  unit: row[3].toString(),
                 ),
               );
-            } else if (row.length >= 3) {
+            } else if (row.length >= 2) {
               loadedItems.add(
                 InventoryItem(
                   name: row[0].toString(),
                   category: 'General',
-                  unit: 'pcs',
                   quantity: int.tryParse(row[1].toString()) ?? 0,
-                  price: double.tryParse(row[2].toString()) ?? 0.0,
+                  unit: 'pcs',
                 ),
               );
             }
@@ -435,16 +416,18 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
+              pw.SizedBox(height: 10),
+              pw.Text('Developer: 2/O Renante N. Fullo',
+                  style: const pw.TextStyle(fontSize: 12)),
               pw.SizedBox(height: 20),
               pw.Table.fromTextArray(
-                headers: ['Item Name', 'Category', 'Qty', 'Unit', 'Price (PHP)'],
+                headers: ['Item Name', 'Category', 'Qty', 'Unit'],
                 data: _items
                     .map((item) => [
                           item.name,
                           item.category,
                           item.quantity.toString(),
                           item.unit,
-                          item.price.toStringAsFixed(2)
                         ])
                     .toList(),
               ),
@@ -461,6 +444,16 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredItems = _items.where((item) {
+      return item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          item.category.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+
+    int totalQuantity = _items.fold(
+      0,
+      (sum, item) => sum + item.quantity,
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Stationery Inventory'),
@@ -520,41 +513,107 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
           ),
         ],
       ),
-      body: _items.isEmpty
-          ? const Center(child: Text('Walang laman ang inventory.'))
-          : ListView.builder(
-              itemCount: _items.length,
-              itemBuilder: (context, index) {
-                final item = _items[index];
-                return ListTile(
-                  leading: CircleAvatar(child: Text('${index + 1}')),
-                  title: Text(item.name),
-                  subtitle: Text(
-                    '${item.category} • Qty: ${item.quantity} ${item.unit}',
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '₱${item.price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12.0),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total Items: ${_items.length}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Total Quantity: $totalQuantity',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.indigo,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () {
-                          setState(() {
-                            _items.removeAt(index);
-                          });
-                        },
-                      ),
-                    ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search items or category...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surface,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
-                );
-              },
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                ),
+              ],
             ),
+          ),
+          Expanded(
+            child: filteredItems.isEmpty
+                ? const Center(child: Text('Walang nahanap na items.'))
+                : ListView.builder(
+                    itemCount: filteredItems.length,
+                    itemBuilder: (context, index) {
+                      final item = filteredItems[index];
+                      final bool isLowStock = item.quantity <= 5;
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor:
+                              isLowStock ? Colors.red.shade100 : null,
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              color: isLowStock ? Colors.red : null,
+                            ),
+                          ),
+                        ),
+                        title: Text(item.name),
+                        subtitle: Text(
+                          '${item.category} • Low Stock Alert'
+                          '${isLowStock ? ' (Critical)' : ''}',
+                          style: TextStyle(
+                            color: isLowStock ? Colors.red : null,
+                          ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${item.quantity} ${item.unit}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: isLowStock ? Colors.red : null,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  _items.remove(item);
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddItemDialog,
         icon: const Icon(Icons.add),
