@@ -1,4 +1,4 @@
-name: Build Android APK
+:name: Build Android APK
 
 on:
   push:
@@ -30,45 +30,43 @@ jobs:
       - name: Generate Flutter Native Platform Files
         run: flutter create --platforms=android --project-name stationery_inventory --no-pub .
 
-      - name: Force compileSdk 36 on all plugins
+      - name: Configure compileSdk in build.gradle.kts
         run: |
           python3 -c '
           import os
 
-          # Inject subprojects compileSdk override in build.gradle
-          gradle_files = []
-          for root, dirs, files in os.walk("android"):
-              for file in files:
-                  if file in ["build.gradle", "build.gradle.kts"]:
-                      gradle_files.append(os.path.join(root, file))
-
+          # Inject compileSdk override block for Kotlin DSL build.gradle.kts
           override_code = """
+
           subprojects {
-              afterEvaluate { project ->
-                  if (project.hasProperty("android")) {
-                      project.android {
-                          compileSdkVersion = 36
-                      }
-                  }
+              plugins.withId("com.android.application") {
+                  val android = extensions.getByType(com.android.build.gradle.AppExtension::class.java)
+                  android.compileSdkVersion(36)
+              }
+              plugins.withId("com.android.library") {
+                  val android = extensions.getByType(com.android.build.gradle.LibraryExtension::class.java)
+                  android.compileSdkVersion(36)
               }
           }
           """
 
-          root_gradle = "android/build.gradle"
-          if os.path.exists("android/build.gradle.kts"):
-              root_gradle = "android/build.gradle.kts"
-              override_code = """
+          file_path = "android/build.gradle.kts"
+          if os.path.exists(file_path):
+              with open(file_path, "a") as f:
+                  f.write(override_code)
+          elif os.path.exists("android/build.gradle"):
+              groovy_code = """
               subprojects {
-                  afterEvaluate {
-                      val android = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
-                      android?.compileSdkVersion(36)
+                  plugins.withId("com.android.application") {
+                      android { compileSdkVersion 36 }
+                  }
+                  plugins.withId("com.android.library") {
+                      android { compileSdkVersion 36 }
                   }
               }
               """
-
-          if os.path.exists(root_gradle):
-              with open(root_gradle, "a") as f:
-                  f.write(override_code)
+              with open("android/build.gradle", "a") as f:
+                  f.write(groovy_code)
           '
 
       - name: Install Dependencies
@@ -85,3 +83,4 @@ jobs:
         with:
           name: stationery-inventory-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+  
