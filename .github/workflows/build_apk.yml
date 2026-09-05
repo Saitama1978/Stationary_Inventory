@@ -30,19 +30,20 @@ jobs:
       - name: Generate Flutter Native Platform Files
         run: flutter create --platforms=android --project-name stationery_inventory --no-pub .
 
-      - name: Inject Android SDK 36 Configurations
+      - name: Force compileSdk 36 across all subprojects
         run: |
-          # 1. Force compileSdk in app build.gradle.kts / build.gradle
-          find android -name "build.gradle.kts" -exec sed -i 's/compileSdk =.*/compileSdk = 36/g' {} +
-          find android -name "build.gradle" -exec sed -i 's/compileSdkVersion.*/compileSdkVersion 36/g' {} +
-
-          # 2. Append subprojects override using legacy-compatible script block
           cat << 'EOF' >> android/build.gradle.kts
+
           subprojects {
-              afterEvaluate {
-                  if (project.hasProperty("android")) {
-                      val android = project.extensions.findByName("android") as? com.android.build.gradle.BaseExtension
-                      android?.compileSdkVersion(36)
+              val updateSdk = {
+                  val android = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
+                  android?.compileSdkVersion(36)
+              }
+              if (state.executed) {
+                  updateSdk()
+              } else {
+                  afterEvaluate {
+                      updateSdk()
                   }
               }
           }
