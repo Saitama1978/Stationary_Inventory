@@ -112,7 +112,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     );
   }
 
-  // 1. SAVE AS / EXPORT TO CSV FUNCTION
+  // 1. SAVE AS / EXPORT TO CSV FUNCTION WITH CUSTOM NAME & FOLDER SELECTION
   Future<void> _exportAndSaveCSV() async {
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -272,7 +272,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
         pageFormat: PdfPageFormat.a4,
         build: (pw.Context context) {
           return pw.Column(
-            cross: pw.CrossAxisAlignment.start,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
                 'Stationery Inventory Report',
