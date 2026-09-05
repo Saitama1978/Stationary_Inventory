@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:csv/csv.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -11,30 +11,19 @@ void main() {
   runApp(const StationeryApp());
 }
 
-class StationeryApp extends StatefulWidget {
+class StationeryApp extends StatelessWidget {
   const StationeryApp({super.key});
-
-  @override
-  State<StationeryApp> createState() => _StationeryAppState();
-}
-
-class _StationeryAppState extends State<StationeryApp> {
-  bool isDarkMode = true;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Stationery Inventory',
       debugShowCheckedModeBanner: false,
-      theme: isDarkMode ? ThemeData.dark() : ThemeData.light(),
-      home: InventoryScreen(
-        isDarkMode: isDarkMode,
-        onThemeChanged: () {
-          setState(() {
-            isDarkMode = !isDarkMode;
-          });
-        },
+      theme: ThemeData(
+        primarySwatch: Colors.indigo,
+        useMaterial3: true,
       ),
+      home: const InventoryHomePage(),
     );
   }
 }
@@ -42,157 +31,240 @@ class _StationeryAppState extends State<StationeryApp> {
 class InventoryItem {
   String name;
   int quantity;
-  String unit;
-  String remarks;
+  double price;
 
   InventoryItem({
     required this.name,
     required this.quantity,
-    required this.unit,
-    required this.remarks,
+    required this.price,
   });
 }
 
-class InventoryScreen extends StatefulWidget {
-  final bool isDarkMode;
-  final VoidCallback onThemeChanged;
-
-  const InventoryScreen({
-    super.key,
-    required this.isDarkMode,
-    required this.onThemeChanged,
-  });
+class InventoryHomePage extends StatefulWidget {
+  const InventoryHomePage({super.key});
 
   @override
-  State<InventoryScreen> createState() => _InventoryScreenState();
+  State<InventoryHomePage> createState() => _InventoryHomePageState();
 }
 
-class _InventoryScreenState extends State<InventoryScreen> {
-  final List<String> presetItems = [
-    'A4 Paper',
-    'Ballpen (Blue)',
-    'Ballpen (Black)',
-    'Ballpen (Red)',
-    'Pencil',
-    'Eraser',
-    'Stapler',
-    'Staple Wire',
-    'Paper Clip',
-    'Folder',
-    'Envelope',
-    'Correction Tape',
-    'OTHER'
+class _InventoryHomePageState extends State<InventoryHomePage> {
+  final List<InventoryItem> _items = [
+    InventoryItem(name: 'Notebook A5', quantity: 25, price: 45.00),
+    InventoryItem(name: 'Ballpen Black', quantity: 100, price: 12.00),
   ];
 
-  final List<String> presetUnits = [
-    'pcs',
-    'box',
-    'pack',
-    'ream',
-    'roll',
-    'set',
-    'OTHER'
-  ];
-
-  String? selectedItem = 'A4 Paper';
-  String customItem = '';
-  int quantity = 1;
-  String? selectedUnit = 'pcs';
-  String customUnit = '';
-  String remarks = '';
-
-  List<InventoryItem> inventoryList = [];
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _qtyController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
 
   void _addItem() {
-    String finalItem = (selectedItem == 'OTHER') ? customItem.trim() : (selectedItem ?? '');
-    String finalUnit = (selectedUnit == 'OTHER') ? customUnit.trim() : (selectedUnit ?? '');
+    final String name = _nameController.text.trim();
+    final int? qty = int.tryParse(_qtyController.text);
+    final double? price = double.tryParse(_priceController.text);
 
-    if (finalItem.isEmpty) {
+    if (name.isNotEmpty && qty != null && price != null) {
+      setState(() {
+        _items.add(InventoryItem(name: name, quantity: qty, price: price));
+      });
+      _nameController.clear();
+      _qtyController.clear();
+      _priceController.clear();
+      Navigator.pop(context);
+    }
+  }
+
+  void _showAddItemDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Item'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Item Name'),
+            ),
+            TextField(
+              controller: _qtyController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Quantity'),
+            ),
+            TextField(
+              controller: _priceController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Price (PHP)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: _addItem,
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 1. SAVE AS / EXPORT TO CSV FUNCTION
+  Future<void> _exportAndSaveCSV() async {
+    if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Paki-pili o paki-type ang item!')),
+        const SnackBar(content: Text('Walang items sa listahan para i-save.')),
       );
       return;
     }
 
-    setState(() {
-      inventoryList.add(InventoryItem(
-        name: finalItem,
-        quantity: quantity,
-        unit: finalUnit.isEmpty ? 'pcs' : finalUnit,
-        remarks: remarks,
-      ));
-      remarks = '';
-    });
-  }
+    // A. Ask File Name Dialog
+    final TextEditingController fileNameController =
+        TextEditingController(text: 'Stationery_Inventory');
 
-  void _clearAll() {
-    setState(() {
-      inventoryList.clear();
-    });
-  }
-
-  // SAVE TO EXCEL (.CSV)
-  Future<void> _exportToExcel() async {
-    if (inventoryList.isEmpty) return;
-
-    List<List<dynamic>> rows = [
-      ["Item Name", "Quantity", "Unit", "Remarks"],
-      ...inventoryList.map((item) => [item.name, item.quantity, item.unit, item.remarks])
-    ];
-
-    String csvData = const ListToCsvConverter().convert(rows);
-
-    String? outputPath = await FilePicker.platform.saveFile(
-      dialogTitle: 'Save Inventory Excel (.csv)',
-      fileName: 'stationery_inventory.csv',
+    String? finalFileName = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Save Inventory File'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Maglagay ng pangalan ng file:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: fileNameController,
+              decoration: const InputDecoration(
+                labelText: 'File Name',
+                border: OutlineInputBorder(),
+                suffixText: '.csv',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, null),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              String name = fileNameController.text.trim();
+              if (name.isEmpty) name = 'Stationery_Inventory';
+              Navigator.pop(dialogContext, name);
+            },
+            child: const Text('Choose Folder'),
+          ),
+        ],
+      ),
     );
 
-    if (outputPath != null) {
-      final file = File(outputPath);
-      await file.writeAsString(csvData);
+    if (finalFileName == null) return;
+    if (!finalFileName.endsWith('.csv')) finalFileName = '$finalFileName.csv';
+
+    // B. Build CSV Data
+    List<List<dynamic>> rows = [
+      ['Item Name', 'Quantity', 'Price'],
+      ..._items.map((item) => [item.name, item.quantity, item.price]),
+    ];
+    String csvData = const ListToCsvConverter().convert(rows);
+
+    // C. Pick Folder Location and Save
+    try {
+      String? outputFile = await FilePicker.platform.saveFile(
+        dialogTitle: 'Pumili ng Folder kung saan i-se-save:',
+        fileName: finalFileName,
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+
+      if (outputFile != null) {
+        final file = File(outputFile);
+        await file.writeAsString(csvData);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Matagumpay na na-save sa:\n$outputFile'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Na-save sa: $outputPath')),
+          SnackBar(
+            content: Text('Error sa pag-save: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
 
-  // LOAD DATA FROM EXCEL (.CSV)
-  Future<void> _loadFromExcel() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['csv'],
-    );
+  // 2. LOAD CSV FILE TO APP
+  Future<void> _loadCSVFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
 
-    if (result != null && result.files.single.path != null) {
-      final file = File(result.files.single.path!);
-      final input = await file.readAsString();
-      List<List<dynamic>> fields = const CsvToListConverter().convert(input);
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final input = await file.readAsString();
+        final List<List<dynamic>> fields =
+            const CsvToListConverter().convert(input);
 
-      if (fields.length > 1) {
-        setState(() {
-          inventoryList.clear();
-          for (var i = 1; i < fields.length; i++) {
-            var row = fields[i];
+        if (fields.length > 1) {
+          List<InventoryItem> loadedItems = [];
+          for (int i = 1; i < fields.length; i++) {
+            final row = fields[i];
             if (row.length >= 3) {
-              inventoryList.add(InventoryItem(
-                name: row[0].toString(),
-                quantity: int.tryParse(row[1].toString()) ?? 1,
-                unit: row[2].toString(),
-                remarks: row.length > 3 ? row[3].toString() : '',
-              ));
+              loadedItems.add(
+                InventoryItem(
+                  name: row[0].toString(),
+                  quantity: int.tryParse(row[1].toString()) ?? 0,
+                  price: double.tryParse(row[2].toString()) ?? 0.0,
+                ),
+              );
             }
           }
-        });
+
+          setState(() {
+            _items.clear();
+            _items.addAll(loadedItems);
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Matagumpay na na-load ang inventory!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sa pag-load ng file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
 
-  // PRINT / SAVE AS PDF
-  Future<void> _printOrPdf() async {
-    if (inventoryList.isEmpty) return;
-
+  // 3. PRINT / GENERATE PDF REPORT
+  Future<void> _generatePdfReport() async {
     final pdf = pw.Document();
 
     pdf.addPage(
@@ -200,15 +272,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
         pageFormat: PdfPageFormat.a4,
         build: (pw.Context context) {
           return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            cross: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text('Stationery Inventory Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 10),
-              pw.Text('Developed by: Renante Fullo'),
+              pw.Text(
+                'Stationery Inventory Report',
+                style: pw.TextStyle(
+                  fontSize: 24,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.SizedBox(height: 20),
-              pw.TableHelper.fromTextArray(
-                headers: ['Item Name', 'Quantity', 'Unit', 'Remarks'],
-                data: inventoryList.map((i) => [i.name, i.quantity.toString(), i.unit, i.remarks]).toList(),
+              pw.Table.fromTextArray(
+                headers: ['Item Name', 'Quantity', 'Price (PHP)'],
+                data: _items
+                    .map((item) => [
+                          item.name,
+                          item.quantity.toString(),
+                          item.price.toStringAsFixed(2)
+                        ])
+                    .toList(),
               ),
             ],
           );
@@ -216,7 +298,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
     );
 
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
   }
 
   @override
@@ -226,226 +310,60 @@ class _InventoryScreenState extends State<InventoryScreen> {
         title: const Text('Stationery Inventory'),
         actions: [
           IconButton(
-            icon: Icon(widget.isDarkMode ? Icons.wb_sunny : Icons.nightlight_round),
-            onPressed: widget.onThemeChanged,
+            icon: const Icon(Icons.folder_open),
+            tooltip: 'Load CSV File',
+            onPressed: _loadCSVFile,
+          ),
+          IconButton(
+            icon: const Icon(Icons.save_as),
+            tooltip: 'Save As CSV File',
+            onPressed: _exportAndSaveCSV,
+          ),
+          IconButton(
+            icon: const Icon(Icons.print),
+            tooltip: 'Print / Save PDF',
+            onPressed: _generatePdfReport,
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: selectedItem,
-                      decoration: const InputDecoration(labelText: 'Item ng Stationery'),
-                      items: presetItems.map((item) {
-                        return DropdownMenuItem(value: item, child: Text(item));
-                      }).toList(),
-                      onChanged: (val) => setState(() => selectedItem = val),
-                    ),
-                    if (selectedItem == 'OTHER')
-                      TextField(
-                        decoration: const InputDecoration(labelText: 'I-type ang pangalan ng Item'),
-                        onChanged: (val) => customItem = val,
-                      ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            initialValue: '1',
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(labelText: 'Dami (Quantity)'),
-                            onChanged: (val) => quantity = int.tryParse(val) ?? 1,
-                          ),
+      body: _items.isEmpty
+          ? const Center(child: Text('Walang laman ang inventory.'))
+          : ListView.builder(
+              itemCount: _items.length,
+              itemBuilder: (context, index) {
+                final item = _items[index];
+                return ListTile(
+                  leading: CircleAvatar(child: Text('${index + 1}')),
+                  title: Text(item.name),
+                  subtitle: Text('Qty: ${item.quantity}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '₱${item.price.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: selectedUnit,
-                            decoration: const InputDecoration(labelText: 'Unit'),
-                            items: presetUnits.map((u) {
-                              return DropdownMenuItem(value: u, child: Text(u));
-                            }).toList(),
-                            onChanged: (val) => setState(() => selectedUnit = val),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (selectedUnit == 'OTHER')
-                      TextField(
-                        decoration: const InputDecoration(labelText: 'I-type ang Unit'),
-                        onChanged: (val) => customUnit = val,
                       ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      decoration: const InputDecoration(labelText: 'Remarks / Puna'),
-                      onChanged: (val) => remarks = val,
-                    ),
-                    const SizedBox(height: 15),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(45),
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            _items.removeAt(index);
+                          });
+                        },
                       ),
-                      onPressed: _addItem,
-                      child: const Text('DAGDAG SA LISTAHAN'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 15),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _exportToExcel,
-                  icon: const Icon(Icons.table_chart),
-                  label: const Text('Save Excel'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _printOrPdf,
-                  icon: const Icon(Icons.print),
-                  label: const Text('Print / PDF'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _loadFromExcel,
-                  icon: const Icon(Icons.folder_open),
-                  label: const Text('Load File'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _clearAll,
-                  icon: const Icon(Icons.delete),
-                  label: const Text('Burahin Lahat'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-            const Text('MGA NAITAALANG ITEM', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            inventoryList.isEmpty
-                ? const Text('Walang laman ang listahan')
-                : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: inventoryList.length,
-                    itemBuilder: (ctx, idx) {
-                      final item = inventoryList[idx];
-                      return Card(
-                        child: ListTile(
-                          title: Text('${item.name} - ${item.quantity} ${item.unit}'),
-                          subtitle: item.remarks.isNotEmpty ? Text(item.remarks) : null,
-                          trailing: IconButton(
-                            icon: const Icon(Icons.close, color: Colors.red),
-                            onPressed: () => setState(() => inventoryList.removeAt(idx)),
-                          ),
-                        ),
-                      );
-                    },
+                    ],
                   ),
-            const SizedBox(height: 20),
-            const Text('Developed by: Renante Fullo', style: TextStyle(color: Colors.grey)),
-          ],
-        ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddItemDialog,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Item'),
       ),
     );
-  }
-}
-// ==========================================
-// PASTE THIS AT THE VERY BOTTOM OF YOUR FILE
-// ==========================================
-Future<void> exportAndSaveExcel({
-  required BuildContext context,
-  required List<int> excelBytes,
-  String defaultFileName = "Inventory_Report",
-}) async {
-  TextEditingController fileNameController =
-      TextEditingController(text: defaultFileName);
-
-  String? finalFileName = await showDialog<String>(
-    context: context,
-    builder: (BuildContext dialogContext) {
-      return AlertDialog(
-        title: const Text("Export Excel File"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAlignment.start,
-          children: [
-            const Text("Pumili ng pangalan para sa iyong file:"),
-            const SizedBox(height: 10),
-            TextField(
-              controller: fileNameController,
-              decoration: const InputDecoration(
-                labelText: "File Name",
-                border: OutlineInputBorder(),
-                suffixText: ".xlsx",
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, null),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              String name = fileNameController.text.trim();
-              if (name.isEmpty) name = defaultFileName;
-              Navigator.pop(dialogContext, name);
-            },
-            child: const Text("Next (Select Folder)"),
-          ),
-        ],
-      );
-    },
-  );
-
-  if (finalFileName == null) return;
-
-  if (!finalFileName.endsWith('.xlsx')) {
-    finalFileName = '$finalFileName.xlsx';
-  }
-
-  try {
-    String? outputFile = await FilePicker.platform.saveFile(
-      dialogTitle: 'Pumili ng Folder kung saan i-se-save:',
-      fileName: finalFileName,
-      type: FileType.custom,
-      allowedExtensions: ['xlsx'],
-    );
-
-    if (outputFile != null) {
-      final file = File(outputFile);
-      await file.writeAsBytes(excelBytes);
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Matagumpay na na-save sa:\n$outputFile"),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    }
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error sa pag-save ng file: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 }
