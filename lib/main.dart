@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
@@ -104,7 +105,6 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     'Office Equipment',
   ];
 
-  // Mas pinalawak na Units list
   final List<String> _units = [
     'pcs',
     'box',
@@ -260,7 +260,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     showAboutDialog(
       context: context,
       applicationName: 'Stationery Inventory',
-      applicationVersion: '1.3.0',
+      applicationVersion: '1.3.1',
       applicationIcon: const Icon(Icons.inventory, size: 48),
       children: const [
         Text('Developer: 2/O Renante N. Fullo'),
@@ -330,17 +330,17 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     String csvData = const ListToCsvConverter().convert(rows);
 
     try {
+      final bytes = Uint8List.fromList(utf8.encode(csvData));
+
       String? outputFile = await FilePicker.platform.saveFile(
         dialogTitle: 'Pumili ng Folder kung saan i-se-save:',
         fileName: finalFileName,
+        bytes: bytes,
         type: FileType.custom,
         allowedExtensions: ['csv'],
       );
 
       if (outputFile != null) {
-        final file = File(outputFile);
-        await file.writeAsString(csvData);
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -594,7 +594,6 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                   },
                 ),
                 const SizedBox(height: 10),
-                // Category Filter Chips
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
