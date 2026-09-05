@@ -360,3 +360,92 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 }
+// ==========================================
+// PASTE THIS AT THE VERY BOTTOM OF YOUR FILE
+// ==========================================
+Future<void> exportAndSaveExcel({
+  required BuildContext context,
+  required List<int> excelBytes,
+  String defaultFileName = "Inventory_Report",
+}) async {
+  TextEditingController fileNameController =
+      TextEditingController(text: defaultFileName);
+
+  String? finalFileName = await showDialog<String>(
+    context: context,
+    builder: (BuildContext dialogContext) {
+      return AlertDialog(
+        title: const Text("Export Excel File"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAlignment.start,
+          children: [
+            const Text("Pumili ng pangalan para sa iyong file:"),
+            const SizedBox(height: 10),
+            TextField(
+              controller: fileNameController,
+              decoration: const InputDecoration(
+                labelText: "File Name",
+                border: OutlineInputBorder(),
+                suffixText: ".xlsx",
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, null),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              String name = fileNameController.text.trim();
+              if (name.isEmpty) name = defaultFileName;
+              Navigator.pop(dialogContext, name);
+            },
+            child: const Text("Next (Select Folder)"),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (finalFileName == null) return;
+
+  if (!finalFileName.endsWith('.xlsx')) {
+    finalFileName = '$finalFileName.xlsx';
+  }
+
+  try {
+    String? outputFile = await FilePicker.platform.saveFile(
+      dialogTitle: 'Pumili ng Folder kung saan i-se-save:',
+      fileName: finalFileName,
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'],
+    );
+
+    if (outputFile != null) {
+      final file = File(outputFile);
+      await file.writeAsBytes(excelBytes);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Matagumpay na na-save sa:\n$outputFile"),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error sa pag-save ng file: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
