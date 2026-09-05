@@ -30,12 +30,46 @@ jobs:
       - name: Generate Flutter Native Platform Files
         run: flutter create --platforms=android --project-name stationery_inventory --no-pub .
 
-      - name: Set Android SDK Version 36 in Gradle Properties
+      - name: Force compileSdk 36 on all plugins
         run: |
-          mkdir -p android
-          echo "flutter.compileSdkVersion=36" >> android/gradle.properties
-          echo "flutter.targetSdkVersion=36" >> android/gradle.properties
-          echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
+          python3 -c '
+          import os
+
+          # Inject subprojects compileSdk override in build.gradle
+          gradle_files = []
+          for root, dirs, files in os.walk("android"):
+              for file in files:
+                  if file in ["build.gradle", "build.gradle.kts"]:
+                      gradle_files.append(os.path.join(root, file))
+
+          override_code = """
+          subprojects {
+              afterEvaluate { project ->
+                  if (project.hasProperty("android")) {
+                      project.android {
+                          compileSdkVersion = 36
+                      }
+                  }
+              }
+          }
+          """
+
+          root_gradle = "android/build.gradle"
+          if os.path.exists("android/build.gradle.kts"):
+              root_gradle = "android/build.gradle.kts"
+              override_code = """
+              subprojects {
+                  afterEvaluate {
+                      val android = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
+                      android?.compileSdkVersion(36)
+                  }
+              }
+              """
+
+          if os.path.exists(root_gradle):
+              with open(root_gradle, "a") as f:
+                  f.write(override_code)
+          '
 
       - name: Install Dependencies
         run: flutter pub get
