@@ -1,4 +1,4 @@
-import 'dart01io';
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -149,7 +149,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
 
     showDialog(
       context: context,
-      builder: (context) => StatefulWidget(
+      builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
             title: const Text('Add New Item'),
