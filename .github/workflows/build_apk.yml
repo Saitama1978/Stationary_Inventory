@@ -1,4 +1,4 @@
-:name: Build Android APK
+name: Build Android APK
 
 on:
   push:
@@ -83,4 +83,3 @@ jobs:
         with:
           name: stationery-inventory-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-  
