@@ -1,5 +1,5 @@
+import 'dart01io';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
@@ -11,37 +11,72 @@ void main() {
   runApp(const StationeryApp());
 }
 
-class StationeryApp extends StatelessWidget {
+class StationeryApp extends StatefulWidget {
   const StationeryApp({super.key});
+
+  @override
+  State<StationeryApp> createState() => _StationeryAppState();
+}
+
+class _StationeryAppState extends State<StationeryApp> {
+  ThemeMode _themeMode = ThemeMode.light;
+
+  void _toggleTheme() {
+    setState(() {
+      _themeMode =
+          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Stationery Inventory',
       debugShowCheckedModeBanner: false,
+      themeMode: _themeMode,
       theme: ThemeData(
-        primarySwatch: Colors.indigo,
         useMaterial3: true,
+        colorSchemeSeed: Colors.indigo,
+        brightness: Brightness.light,
       ),
-      home: const InventoryHomePage(),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: Colors.indigo,
+        brightness: Brightness.dark,
+      ),
+      home: InventoryHomePage(
+        onToggleTheme: _toggleTheme,
+        isDarkMode: _themeMode == ThemeMode.dark,
+      ),
     );
   }
 }
 
 class InventoryItem {
   String name;
+  String category;
+  String unit;
   int quantity;
   double price;
 
   InventoryItem({
     required this.name,
+    required this.category,
+    required this.unit,
     required this.quantity,
     required this.price,
   });
 }
 
 class InventoryHomePage extends StatefulWidget {
-  const InventoryHomePage({super.key});
+  final VoidCallback onToggleTheme;
+  final bool isDarkMode;
+
+  const InventoryHomePage({
+    super.key,
+    required this.onToggleTheme,
+    required this.isDarkMode,
+  });
 
   @override
   State<InventoryHomePage> createState() => _InventoryHomePageState();
@@ -49,13 +84,38 @@ class InventoryHomePage extends StatefulWidget {
 
 class _InventoryHomePageState extends State<InventoryHomePage> {
   final List<InventoryItem> _items = [
-    InventoryItem(name: 'Notebook A5', quantity: 25, price: 45.00),
-    InventoryItem(name: 'Ballpen Black', quantity: 100, price: 12.00),
+    InventoryItem(
+      name: 'Notebook A5',
+      category: 'Paper',
+      unit: 'pcs',
+      quantity: 25,
+      price: 45.00,
+    ),
+    InventoryItem(
+      name: 'Ballpen Black',
+      category: 'Writing',
+      unit: 'pcs',
+      quantity: 100,
+      price: 12.00,
+    ),
   ];
+
+  final List<String> _categories = [
+    'General',
+    'Writing',
+    'Paper',
+    'Art Supplies',
+    'Office Equipment',
+  ];
+
+  final List<String> _units = ['pcs', 'box', 'pack', 'set', 'roll'];
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _qtyController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
+
+  String _selectedCategory = 'General';
+  String _selectedUnit = 'pcs';
 
   void _addItem() {
     final String name = _nameController.text.trim();
@@ -64,55 +124,139 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
 
     if (name.isNotEmpty && qty != null && price != null) {
       setState(() {
-        _items.add(InventoryItem(name: name, quantity: qty, price: price));
+        _items.add(
+          InventoryItem(
+            name: name,
+            category: _selectedCategory,
+            unit: _selectedUnit,
+            quantity: qty,
+            price: price,
+          ),
+        );
       });
       _nameController.clear();
       _qtyController.clear();
       _priceController.clear();
+      _selectedCategory = 'General';
+      _selectedUnit = 'pcs';
       Navigator.pop(context);
     }
   }
 
   void _showAddItemDialog() {
+    _selectedCategory = _categories.first;
+    _selectedUnit = _units.first;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Item'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Item Name'),
+      builder: (context) => StatefulWidget(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Add New Item'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Item Name',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _selectedCategory,
+                    decoration: const InputDecoration(
+                      labelText: 'Category',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _categories.map((cat) {
+                      return DropdownMenuItem(value: cat, child: Text(cat));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => _selectedCategory = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _qtyController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Quantity',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedUnit,
+                          decoration: const InputDecoration(
+                            labelText: 'Unit',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: _units.map((u) {
+                            return DropdownMenuItem(value: u, child: Text(u));
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setDialogState(() => _selectedUnit = val);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _priceController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Price (PHP)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            TextField(
-              controller: _qtyController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Quantity'),
-            ),
-            TextField(
-              controller: _priceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Price (PHP)'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: _addItem,
-            child: const Text('Save'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: _addItem,
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  // 1. SAVE AS / EXPORT TO CSV FUNCTION WITH CUSTOM NAME & FOLDER SELECTION
+  void _showDeveloperInfo() {
+    showAboutDialog(
+      context: context,
+      applicationName: 'Stationery Inventory',
+      applicationVersion: '1.0.0',
+      applicationIcon: const Icon(Icons.inventory, size: 48),
+      children: const [
+        Text('Developer: Kenneth Quintero'),
+        SizedBox(height: 8),
+        Text('A mobile application designed for efficient inventory management.'),
+      ],
+    );
+  }
+
   Future<void> _exportAndSaveCSV() async {
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -121,7 +265,6 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
       return;
     }
 
-    // A. Ask File Name Dialog
     final TextEditingController fileNameController =
         TextEditingController(text: 'Stationery_Inventory');
 
@@ -165,14 +308,15 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     if (finalFileName == null) return;
     if (!finalFileName.endsWith('.csv')) finalFileName = '$finalFileName.csv';
 
-    // B. Build CSV Data
     List<List<dynamic>> rows = [
-      ['Item Name', 'Quantity', 'Price'],
-      ..._items.map((item) => [item.name, item.quantity, item.price]),
+      ['Item Name', 'Category', 'Unit', 'Quantity', 'Price'],
+      ..._items.map(
+        (item) =>
+            [item.name, item.category, item.unit, item.quantity, item.price],
+      ),
     ];
     String csvData = const ListToCsvConverter().convert(rows);
 
-    // C. Pick Folder Location and Save
     try {
       String? outputFile = await FilePicker.platform.saveFile(
         dialogTitle: 'Pumili ng Folder kung saan i-se-save:',
@@ -207,7 +351,6 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     }
   }
 
-  // 2. LOAD CSV FILE TO APP
   Future<void> _loadCSVFile() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -225,10 +368,22 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
           List<InventoryItem> loadedItems = [];
           for (int i = 1; i < fields.length; i++) {
             final row = fields[i];
-            if (row.length >= 3) {
+            if (row.length >= 5) {
               loadedItems.add(
                 InventoryItem(
                   name: row[0].toString(),
+                  category: row[1].toString(),
+                  unit: row[2].toString(),
+                  quantity: int.tryParse(row[3].toString()) ?? 0,
+                  price: double.tryParse(row[4].toString()) ?? 0.0,
+                ),
+              );
+            } else if (row.length >= 3) {
+              loadedItems.add(
+                InventoryItem(
+                  name: row[0].toString(),
+                  category: 'General',
+                  unit: 'pcs',
                   quantity: int.tryParse(row[1].toString()) ?? 0,
                   price: double.tryParse(row[2].toString()) ?? 0.0,
                 ),
@@ -263,7 +418,6 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     }
   }
 
-  // 3. PRINT / GENERATE PDF REPORT
   Future<void> _generatePdfReport() async {
     final pdf = pw.Document();
 
@@ -283,11 +437,13 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
               ),
               pw.SizedBox(height: 20),
               pw.Table.fromTextArray(
-                headers: ['Item Name', 'Quantity', 'Price (PHP)'],
+                headers: ['Item Name', 'Category', 'Qty', 'Unit', 'Price (PHP)'],
                 data: _items
                     .map((item) => [
                           item.name,
+                          item.category,
                           item.quantity.toString(),
+                          item.unit,
                           item.price.toStringAsFixed(2)
                         ])
                     .toList(),
@@ -310,6 +466,13 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
         title: const Text('Stationery Inventory'),
         actions: [
           IconButton(
+            icon: Icon(
+              widget.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+            ),
+            tooltip: 'Toggle Dark Mode',
+            onPressed: widget.onToggleTheme,
+          ),
+          IconButton(
             icon: const Icon(Icons.folder_open),
             tooltip: 'Load CSV File',
             onPressed: _loadCSVFile,
@@ -324,6 +487,37 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
             tooltip: 'Print / Save PDF',
             onPressed: _generatePdfReport,
           ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'developer') {
+                _showDeveloperInfo();
+              } else if (value == 'clear') {
+                setState(() => _items.clear());
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'developer',
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.indigo),
+                    SizedBox(width: 8),
+                    Text('Developer Info'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'clear',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_sweep, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Clear List'),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: _items.isEmpty
@@ -335,7 +529,9 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                 return ListTile(
                   leading: CircleAvatar(child: Text('${index + 1}')),
                   title: Text(item.name),
-                  subtitle: Text('Qty: ${item.quantity}'),
+                  subtitle: Text(
+                    '${item.category} • Qty: ${item.quantity} ${item.unit}',
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
