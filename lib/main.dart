@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -265,7 +264,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
       children: const [
         Text('Developer: 2/O Renante N. Fullo'),
         SizedBox(height: 8),
-        Text('A mobile application designed for efficient inventory management.'),
+        Text('A web application designed for efficient inventory management.'),
       ],
     );
   }
@@ -312,7 +311,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
               if (name.isEmpty) name = 'Stationery_Inventory';
               Navigator.pop(dialogContext, name);
             },
-            child: const Text('Choose Folder'),
+            child: const Text('Download CSV'),
           ),
         ],
       ),
@@ -332,24 +331,22 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     try {
       final bytes = Uint8List.fromList(utf8.encode(csvData));
 
-      String? outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: 'Pumili ng Folder kung saan i-se-save:',
+      await FilePicker.platform.saveFile(
+        dialogTitle: 'Save CSV File',
         fileName: finalFileName,
         bytes: bytes,
         type: FileType.custom,
         allowedExtensions: ['csv'],
       );
 
-      if (outputFile != null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Matagumpay na na-save sa:\n$outputFile'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Matagumpay na na-download ang CSV file!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -368,11 +365,12 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv'],
+        withData: true,
       );
 
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
-        final input = await file.readAsString();
+      if (result != null && result.files.single.bytes != null) {
+        final bytes = result.files.single.bytes!;
+        final input = utf8.decode(bytes);
         final List<List<dynamic>> fields =
             const CsvToListConverter().convert(input);
 
@@ -428,40 +426,79 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     }
   }
 
+  // --- PDF GENERATION WITH MULTI-PAGE SUPPORT ---
   Future<void> _generatePdfReport() async {
     final pdf = pw.Document();
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
+        margin: const pw.EdgeInsets.all(32),
+        header: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
                 'Stationery Inventory Report',
                 style: pw.TextStyle(
-                  fontSize: 24,
+                  fontSize: 22,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
-              pw.SizedBox(height: 10),
-              pw.Text('Developer: 2/O Renante N. Fullo',
-                  style: const pw.TextStyle(fontSize: 12)),
-              pw.SizedBox(height: 20),
-              pw.Table.fromTextArray(
-                headers: ['Item Name', 'Category', 'Qty', 'Unit'],
-                data: _items
-                    .map((item) => [
-                          item.name,
-                          item.category,
-                          item.quantity.toString(),
-                          item.unit,
-                        ])
-                    .toList(),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'Developer: 2/O Renante N. Fullo',
+                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
               ),
+              pw.SizedBox(height: 10),
+              pw.Divider(),
+              pw.SizedBox(height: 10),
             ],
           );
+        },
+        footer: (pw.Context context) {
+          return pw.Container(
+            alignment: pw.Alignment.centerRight,
+            margin: const pw.EdgeInsets.only(top: 10),
+            child: pw.Text(
+              'Page ${context.pageNumber} of ${context.pagesCount}',
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+            ),
+          );
+        },
+        build: (pw.Context context) {
+          return [
+            pw.Table.fromTextArray(
+              headers: ['No.', 'Item Name', 'Category', 'Qty', 'Unit'],
+              data: List.generate(_items.length, (index) {
+                final item = _items[index];
+                return [
+                  (index + 1).toString(),
+                  item.name,
+                  item.category,
+                  item.quantity.toString(),
+                  item.unit,
+                ];
+              }),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+              ),
+              headerDecoration: const pw.BoxDecoration(
+                color: PdfColors.indigo,
+              ),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellAlignments: {
+                0: pw.Alignment.center,
+                3: pw.Alignment.centerRight,
+              },
+              rowDecoration: const pw.BoxDecoration(
+                border: pw.Border(
+                  bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                ),
+              ),
+            ),
+          ];
         },
       ),
     );
