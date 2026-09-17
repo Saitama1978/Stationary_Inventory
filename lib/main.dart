@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dartt:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -8,17 +8,17 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 void main() {
-  runApp(const StationeryApp());
+  runApp(const GeneralInventoryApp());
 }
 
-class StationeryApp extends StatefulWidget {
-  const StationeryApp({super.key});
+class GeneralInventoryApp extends StatefulWidget {
+  const GeneralInventoryApp({super.key});
 
   @override
-  State<StationeryApp> createState() => _StationeryAppState();
+  State<GeneralInventoryApp> createState() => _GeneralInventoryAppState();
 }
 
-class _StationeryAppState extends State<StationeryApp> {
+class _GeneralInventoryAppState extends State<GeneralInventoryApp> {
   ThemeMode _themeMode = ThemeMode.light;
 
   void _toggleTheme() {
@@ -31,17 +31,17 @@ class _StationeryAppState extends State<StationeryApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Stationery Inventory',
+      title: 'General Inventory',
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Colors.indigo,
+        colorSchemeSeed: Colors.teal,
         brightness: Brightness.light,
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Colors.indigo,
+        colorSchemeSeed: Colors.teal,
         brightness: Brightness.dark,
       ),
       home: InventoryHomePage(
@@ -81,27 +81,35 @@ class InventoryHomePage extends StatefulWidget {
 }
 
 class _InventoryHomePageState extends State<InventoryHomePage> {
+  // Editable App / Report Title
+  String _appTitle = 'General Inventory';
+
   final List<InventoryItem> _items = [
     InventoryItem(
-      name: 'Notebook A5',
-      category: 'Paper',
+      name: 'Safety Helmet',
+      category: 'Hardware & Equipment',
       unit: 'pcs',
-      quantity: 25,
+      quantity: 50,
     ),
     InventoryItem(
-      name: 'Ballpen Black',
-      category: 'Writing',
-      unit: 'box',
-      quantity: 10,
+      name: 'Engine Oil 1L',
+      category: 'Automotive & Spare Parts',
+      unit: 'bottle',
+      quantity: 12,
     ),
   ];
 
   final List<String> _categories = [
     'General',
-    'Writing',
-    'Paper',
-    'Art Supplies',
-    'Office Equipment',
+    'Electronics & Tech',
+    'Food & Beverage',
+    'Hardware & Equipment',
+    'Office & Stationery',
+    'Clothing & Textiles',
+    'Automotive & Spare Parts',
+    'Medical & Health',
+    'Chemicals & Cleaning',
+    'Others',
   ];
 
   final List<String> _units = [
@@ -117,6 +125,18 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     'pair',
     'cartridge',
     'tube',
+    'kg',
+    'g',
+    'L',
+    'mL',
+    'm',
+    'cm',
+    'case',
+    'dozen',
+    'bundle',
+    'pallet',
+    'sack',
+    'container',
   ];
 
   final TextEditingController _nameController = TextEditingController();
@@ -127,6 +147,43 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
   String _selectedCategoryFilter = 'All';
   String _selectedCategory = 'General';
   String _selectedUnit = 'pcs';
+
+  // Function para palitan ang Title
+  void _editTitleDialog() {
+    final TextEditingController titleController =
+        TextEditingController(text: _appTitle);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Inventory Title'),
+        content: TextField(
+          controller: titleController,
+          decoration: const InputDecoration(
+            labelText: 'Title / Department / Ship Name',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (titleController.text.trim().isNotEmpty) {
+                setState(() {
+                  _appTitle = titleController.text.trim();
+                });
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Save Title'),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showItemDialog({InventoryItem? itemToEdit, int? editIndex}) {
     if (itemToEdit != null) {
@@ -258,13 +315,13 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
   void _showDeveloperInfo() {
     showAboutDialog(
       context: context,
-      applicationName: 'Stationery Inventory',
-      applicationVersion: '1.3.1',
-      applicationIcon: const Icon(Icons.inventory, size: 48),
+      applicationName: _appTitle,
+      applicationVersion: '1.0.0',
+      applicationIcon: const Icon(Icons.inventory_2, size: 48),
       children: const [
         Text('Developer: 2/O Renante N. Fullo'),
         SizedBox(height: 8),
-        Text('A web application designed for efficient inventory management.'),
+        Text('A general-purpose inventory management application.'),
       ],
     );
   }
@@ -277,8 +334,9 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
       return;
     }
 
+    final String defaultFileName = _appTitle.replaceAll(' ', '_');
     final TextEditingController fileNameController =
-        TextEditingController(text: 'Stationery_Inventory');
+        TextEditingController(text: defaultFileName);
 
     String? finalFileName = await showDialog<String>(
       context: context,
@@ -308,7 +366,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
           ElevatedButton(
             onPressed: () {
               String name = fileNameController.text.trim();
-              if (name.isEmpty) name = 'Stationery_Inventory';
+              if (name.isEmpty) name = defaultFileName;
               Navigator.pop(dialogContext, name);
             },
             child: const Text('Download CSV'),
@@ -387,15 +445,6 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                   unit: row[3].toString(),
                 ),
               );
-            } else if (row.length >= 2) {
-              loadedItems.add(
-                InventoryItem(
-                  name: row[0].toString(),
-                  category: 'General',
-                  quantity: int.tryParse(row[1].toString()) ?? 0,
-                  unit: 'pcs',
-                ),
-              );
             }
           }
 
@@ -426,7 +475,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
     }
   }
 
-  // --- PDF GENERATION WITH MULTI-PAGE SUPPORT ---
+  // --- MULTI-PAGE PDF GENERATION (Gamit ang customized Title) ---
   Future<void> _generatePdfReport() async {
     final pdf = pw.Document();
 
@@ -439,7 +488,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
-                'Stationery Inventory Report',
+                '$_appTitle Report', // Gagamitin ang custom title dito
                 style: pw.TextStyle(
                   fontSize: 22,
                   fontWeight: pw.FontWeight.bold,
@@ -485,7 +534,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                 color: PdfColors.white,
               ),
               headerDecoration: const pw.BoxDecoration(
-                color: PdfColors.indigo,
+                color: PdfColors.teal,
               ),
               cellAlignment: pw.Alignment.centerLeft,
               cellAlignments: {
@@ -530,7 +579,22 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Stationery Inventory'),
+        // EDITABLE TITLE SA APPBAR
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _appTitle,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit, size: 20),
+              tooltip: 'Edit Title',
+              onPressed: _editTitleDialog,
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: Icon(
@@ -556,7 +620,9 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
           ),
           PopupMenuButton<String>(
             onSelected: (value) {
-              if (value == 'developer') {
+              if (value == 'edit_title') {
+                _editTitleDialog();
+              } else if (value == 'developer') {
                 _showDeveloperInfo();
               } else if (value == 'clear') {
                 setState(() => _items.clear());
@@ -564,10 +630,20 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
+                value: 'edit_title',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_note, color: Colors.teal),
+                    SizedBox(width: 8),
+                    Text('Edit Title'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'developer',
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.indigo),
+                    Icon(Icons.info_outline, color: Colors.teal),
                     SizedBox(width: 8),
                     Text('Developer Info'),
                   ],
@@ -605,7 +681,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                       'Total Quantity: $totalQuantity',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.indigo,
+                        color: Colors.teal,
                       ),
                     ),
                   ],
@@ -614,7 +690,7 @@ class _InventoryHomePageState extends State<InventoryHomePage> {
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search items...',
+                    hintText: 'Search items or categories...',
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
