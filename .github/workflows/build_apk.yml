@@ -28,7 +28,7 @@ jobs:
           cache: true
 
       - name: Generate Flutter Native Platform Files
-        run: flutter create --platforms=android --project-name General_Inventory --no-pub .
+        run: flutter create --platforms=android --project-name general_inventory --no-pub .
 
       - name: Force compileSdk 36 across all subprojects
         run: |
